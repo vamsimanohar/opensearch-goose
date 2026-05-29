@@ -42,5 +42,24 @@
     "enabled": false,
     "type": "builtin",
     "env_keys": []
+  },
+  {
+    "id": "opensearch",
+    "name": "OpenSearch",
+    "description": "Query and manage OpenSearch clusters: indices, mappings, search, shards, cluster health.",
+    "enabled": true,
+    "type": "stdio",
+    "cmd": "uvx",
+    "args": ["opensearch-mcp-server-py"],
+    "env_keys": [
+      "OPENSEARCH_URL",
+      "OPENSEARCH_USERNAME",
+      "OPENSEARCH_PASSWORD",
+      "OPENSEARCH_SSL_VERIFY",
+      "AWS_REGION",
+      "AWS_PROFILE",
+      "AWS_IAM_ARN"
+    ],
+    "timeout": 300
   }
 ]

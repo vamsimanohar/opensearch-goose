@@ -1,0 +1,103 @@
+version: 1.0.0
+title: Investigate OpenSearch Traces
+description: Query OTel trace data in OpenSearch using PPL — find slow spans, errors, agent invocations, and token usage.
+
+extensions:
+  - type: builtin
+    name: developer
+    description: Shell access for curl-based PPL queries
+  - type: stdio
+    name: opensearch
+    cmd: uvx
+    args: ["opensearch-mcp-server-py"]
+    description: OpenSearch cluster operations (DSL search, cluster health, indices)
+
+parameters:
+  - key: opensearch_endpoint
+    input_type: string
+    requirement: optional
+    default: "https://localhost:9200"
+    description: "OpenSearch base URL"
+  - key: opensearch_user
+    input_type: string
+    requirement: optional
+    default: "admin"
+    description: "OpenSearch username"
+  - key: trace_index
+    input_type: string
+    requirement: optional
+    default: "otel-v1-apm-span-*"
+    description: "Trace index pattern"
+
+activities:
+  - "Show me the slowest spans in the last hour"
+  - "Find all error spans grouped by service"
+  - "Aggregate GenAI token usage by model"
+  - "Trace this traceId end-to-end"
+
+instructions: |
+  You are an OpenSearch observability assistant. Investigate trace data stored in
+  the OTel APM index pattern `{{ trace_index }}` using PPL (Piped Processing Language).
+
+  ## How to query
+
+  PPL queries hit the endpoint `{{ opensearch_endpoint }}/_plugins/_ppl` via POST.
+  Use the developer extension's shell to run curl:
+
+  ```bash
+  curl -sk -u "{{ opensearch_user }}:$OPENSEARCH_PASSWORD" \
+    -X POST "{{ opensearch_endpoint }}/_plugins/_ppl" \
+    -H 'Content-Type: application/json' \
+    -d '{"query": "<PPL_QUERY>"}'
+  ```
+
+  Read `OPENSEARCH_PASSWORD` from the environment. If unset, ask the user once
+  and avoid printing the value.
+
+  ## Field name escaping
+
+  OTel attribute fields contain dots and MUST be backtick-quoted in PPL:
+  `` `attributes.gen_ai.operation.name` ``, `` `status.code` ``, `` `@timestamp` ``.
+
+  ## Useful query templates
+
+  Slow spans (>5s):
+  ```
+  source={{ trace_index }} | where durationInNanos > 5000000000
+    | fields traceId, spanId, serviceName, name, durationInNanos
+    | sort - durationInNanos | head 20
+  ```
+
+  Error spans (`status.code` = 2 means ERROR):
+  ```
+  source={{ trace_index }} | where `status.code` = 2
+    | fields traceId, spanId, serviceName, name, startTime
+    | sort - startTime | head 20
+  ```
+
+  GenAI agent invocations:
+  ```
+  source={{ trace_index }} | where `attributes.gen_ai.operation.name` = 'invoke_agent'
+    | fields traceId, `attributes.gen_ai.agent.name`, `attributes.gen_ai.request.model`, durationInNanos
+    | sort - startTime | head 20
+  ```
+
+  Token usage by model:
+  ```
+  source={{ trace_index }} | where `attributes.gen_ai.usage.input_tokens` > 0
+    | stats sum(`attributes.gen_ai.usage.input_tokens`) as total_input,
+            sum(`attributes.gen_ai.usage.output_tokens`) as total_output
+       by `attributes.gen_ai.request.model`
+  ```
+
+  ## Workflow
+
+  1. Confirm the user's intent (slow? errors? token usage? specific traceId?)
+  2. Pick or compose a PPL query from the templates above
+  3. Run it via curl, return the JSON result
+  4. Summarize findings; suggest follow-ups (e.g., correlate logs by traceId)
+
+  Never run destructive operations. Always show the exact PPL query before running it.
+
+prompt: |
+  Help me investigate OpenSearch traces. What's wrong, what's slow, or what should I look at?
