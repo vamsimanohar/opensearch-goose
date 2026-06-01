@@ -281,6 +281,15 @@ export const startGoosed = async (options: StartGoosedOptions): Promise<GoosedRe
     ...buildGoosedEnv(port, serverSecret, goosedPath),
   };
 
+  // Bundled extensions reference paths under this dir via ${OPENSEARCH_GOOSE_BIN_DIR}.
+  // - In packaged builds, extra resources land at process.resourcesPath/bin/...
+  // - In dev (`just run-ui`), they live at <repo>/ui/desktop/src/bin/...
+  if (isPackaged && resourcesPath) {
+    spawnEnv.OPENSEARCH_GOOSE_BIN_DIR = path.join(resourcesPath, 'bin');
+  } else {
+    spawnEnv.OPENSEARCH_GOOSE_BIN_DIR = path.resolve(__dirname, 'bin');
+  }
+
   for (const [key, value] of Object.entries(additionalEnv)) {
     if (value !== undefined) {
       spawnEnv[key] = value;

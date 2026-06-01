@@ -953,14 +953,29 @@ impl ExtensionManager {
                     all_envs.insert("AGENT_SESSION_ID".to_string(), sid.to_string());
                 }
 
+                // Build a substitution map that also includes any env vars set in
+                // the parent process. This lets bundled extensions reference paths
+                // like ${OPENSEARCH_GOOSE_BIN_DIR} that the desktop app injects at
+                // launch time without having to plumb them through env_keys.
+                let mut substitution_map = all_envs.clone();
+                for (k, v) in std::env::vars() {
+                    substitution_map.entry(k).or_insert(v);
+                }
+                let resolved_cmd = substitute_env_vars(cmd, &substitution_map);
+                let resolved_args: Vec<String> = args
+                    .iter()
+                    .map(|a| substitute_env_vars(a, &substitution_map))
+                    .collect();
+
                 // Check for malicious packages before launching the process
-                extension_malware_check::deny_if_malicious_cmd_args(cmd, args).await?;
+                extension_malware_check::deny_if_malicious_cmd_args(&resolved_cmd, &resolved_args)
+                    .await?;
 
                 let command = if let Some(container) = container {
                     let container_id = container.id();
                     tracing::info!(
                         container = %container_id,
-                        cmd = %cmd,
+                        cmd = %resolved_cmd,
                         "Starting stdio extension inside Docker container"
                     );
                     Command::new("docker").configure(|command| {
@@ -969,13 +984,13 @@ impl ExtensionManager {
                             command.arg("-e").arg(format!("{}={}", key, value));
                         }
                         command.arg(container_id);
-                        command.arg(cmd);
-                        command.args(args);
+                        command.arg(&resolved_cmd);
+                        command.args(&resolved_args);
                     })
                 } else {
-                    let cmd = resolve_command(cmd);
+                    let cmd = resolve_command(&resolved_cmd);
                     Command::new(cmd).configure(|command| {
-                        command.args(args).envs(all_envs);
+                        command.args(&resolved_args).envs(all_envs);
                     })
                 };
 

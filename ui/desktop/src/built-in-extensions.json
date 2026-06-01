@@ -46,19 +46,22 @@
   {
     "id": "opensearch",
     "name": "OpenSearch",
-    "description": "Query and manage OpenSearch clusters: indices, mappings, search, shards, cluster health.",
+    "description": "Query AWS OpenSearch domains directly: traces, logs, services, anomaly detection, agent traces, and more. Uses es:ListDomainNames to discover domains then signs PPL requests against each domain's endpoint with SigV4 (service=es). No OpenSearch UI / Dashboards application required.",
     "enabled": true,
     "type": "stdio",
-    "cmd": "uvx",
-    "args": ["opensearch-mcp-server-py"],
+    "cmd": "node",
+    "args": [
+      "${OPENSEARCH_GOOSE_BIN_DIR}/opensearch-mcp-apps/server.js",
+      "--stdio",
+      "--region",
+      "${AWS_REGION}"
+    ],
     "env_keys": [
-      "OPENSEARCH_URL",
-      "OPENSEARCH_USERNAME",
-      "OPENSEARCH_PASSWORD",
-      "OPENSEARCH_SSL_VERIFY",
       "AWS_REGION",
       "AWS_PROFILE",
-      "AWS_IAM_ARN"
+      "AWS_ACCESS_KEY_ID",
+      "AWS_SECRET_ACCESS_KEY",
+      "AWS_SESSION_TOKEN"
     ],
     "timeout": 300
   }

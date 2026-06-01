@@ -1,0 +1,1 @@
+Use this to browse all GenAI-instrumented spans across traces (any span where `attributes.gen_ai.system` is set), sorted by recency. Pass `dataSourceId` from `list_data_sources`; optionally override `dataset` and `limit`.

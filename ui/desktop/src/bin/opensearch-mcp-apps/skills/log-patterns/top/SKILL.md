@@ -1,0 +1,1 @@
+Use this to cluster log lines into the top recurring patterns using PPL's `| patterns` command. Pass `dataSourceId`, `dataset`, and `patternsField` (the long log-body field, typically `body`, `message`, or `log`). Optional `filter` (PPL chain like `where severity = "ERROR"`) and `method` (`brain` (default) or `regex`).

@@ -1,0 +1,1 @@
+Use this when pivoting from a log row to its trace. Pass `dataSourceId` and `traceId` (extracted from the log row); optionally `tracesDataset`, `fromLogId`, and `fromLogDataset` to surface origin context in the header.

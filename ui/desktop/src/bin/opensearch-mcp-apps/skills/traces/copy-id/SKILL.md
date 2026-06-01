@@ -1,0 +1,1 @@
+Use this for the static reference describing how the trace UI exposes "Copy trace ID" — clipboard chip, `Cmd/Ctrl+Shift+C` shortcut, and the `/app/observability-traces#/?traceId=<id>` deep-link. No inputs.

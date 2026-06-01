@@ -1,0 +1,759 @@
+{
+  "manifest_version": "0.3",
+  "name": "opensearch-mcp-apps",
+  "display_name": "OpenSearch MCP Apps",
+  "version": "0.4.0",
+  "description": "Multi-app MCP server that talks directly to AWS OpenSearch domains (managed service) via SigV4. Exposes traces, logs, services, anomaly detection, agent observability, and more. Discovers domains at runtime via es:ListDomainNames; no OpenSearch UI / Dashboards application required.",
+  "author": {
+    "name": "Joshua Li"
+  },
+  "license": "MIT",
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=20.0.0"
+    }
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "server.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server.js",
+        "--stdio",
+        "--region",
+        "${user_config.region}"
+      ],
+      "env": {
+        "AWS_PROFILE": "${user_config.aws_profile}"
+      }
+    }
+  },
+  "user_config": {
+    "region": {
+      "type": "string",
+      "title": "AWS region",
+      "description": "Region used by both es:ListDomainNames and SigV4 signing, e.g. us-west-2. Use the `list_domains` tool to discover OpenSearch domains in this region.",
+      "default": "us-west-2",
+      "required": true
+    },
+    "aws_profile": {
+      "type": "string",
+      "title": "AWS profile",
+      "description": "Profile name from ~/.aws/config used for SigV4. Leave blank to use the SDK default credential chain (env vars, instance role, etc.).",
+      "default": "default",
+      "required": false
+    }
+  },
+  "tools": [
+    {
+      "name": "traces_details",
+      "description": "Load all spans for a single OpenTelemetry trace and render them as a hierarchy with inline timeline bars and a span attribute panel. Pass `dataSourceId` (from `list_data_sources`), `dataset` (the trace index pattern title \u2014 discover via `list_index_patterns`, e.g. `otel-v1-apm-span-*`), and `traceId`; optionally override `limit` (default 500)."
+    },
+    {
+      "name": "traces_from-log",
+      "description": "Pivot from a log line to its full trace tree. Pass `dataSourceId`, `traceId` (extracted from the log row), and optionally `tracesDataset` (default `otel-v1-apm-span-*`), `fromLogId`, `fromLogDataset` (surfaced in the header for context), and `limit` (default 500)."
+    },
+    {
+      "name": "traces_dag",
+      "description": "Render the spans of a single trace as a node-and-edge DAG (parent\u2192child) using inline SVG. Pass `dataSourceId` (from `list_data_sources`), `traceId`, and optionally `dataset` (defaults to `otel-v1-apm-span-*`) and `limit` (default 500)."
+    },
+    {
+      "name": "traces_gantt",
+      "description": "Render a Gantt-style timeline of all spans for a trace, sorted by start time. Each span is a horizontal bar coloured by service. Pass `dataSourceId` (from `list_data_sources`), `traceId`, and optionally `dataset` (defaults to `otel-v1-apm-span-*`) and `limit` (default 500)."
+    },
+    {
+      "name": "traces_related-logs",
+      "description": "Load logs linked to a specific trace (and optionally span) by traceId/spanId. Pass `dataSourceId` (from `list_data_sources`), `logsDataset` (logs index pattern title \u2014 discover via `list_index_patterns`), and `traceId`. Optional `spanId` and `limit` (default 200)."
+    },
+    {
+      "name": "traces_cross-signal-join",
+      "description": "Join spans and logs by traceId (and spanId if present in logs) and render them as a unified chronological timeline. Pass `dataSourceId`, `logsDataset`, and `traceId`. Optional `spansDataset` (default `otel-v1-apm-span-*`) and `limit` (default 500 per side)."
+    },
+    {
+      "name": "traces_conversation",
+      "description": "Group all spans for a GenAI conversation id (`attributes.gen_ai.conversation.id`) and render them as a chronological timeline grouped by traceId. Pass `dataSourceId` and `conversationId`. Optional `dataset` (default `otel-v1-apm-span-*`) and `limit` (default 500)."
+    },
+    {
+      "name": "traces_tool-calls",
+      "description": "Inspect all GenAI tool-call spans in a single trace (spans where `attributes.gen_ai.tool.name` is set). Renders one card per tool call with name, call id, arguments, and result. Pass `dataSourceId` and `traceId`. Optional `dataset` (default `otel-v1-apm-span-*`) and `limit` (default 500)."
+    },
+    {
+      "name": "traces_root-only",
+      "description": "List root spans (parentSpanId is empty), sorted by startTime descending. Pass `dataSourceId` (from `list_data_sources`); optional `dataset` (default `otel-v1-apm-span-*`) and `limit` (default 100)."
+    },
+    {
+      "name": "traces_metrics",
+      "description": "Aggregate KPIs across the trace list \u2014 Total traces, total input/output tokens, P50 / P99 root duration. Pass `dataSourceId` (from `list_data_sources`); optional `dataset` (defaults to `otel-v1-apm-span-*`) and `serviceName`."
+    },
+    {
+      "name": "traces_filter",
+      "description": "List trace root spans filtered by status / kind / service / gen_ai op. Pass `dataSourceId`; optional `dataset` (defaults to `otel-v1-apm-span-*`), `status` (`ok`|`error`), `kind` (`client`|`server`|`producer`|`consumer`|`internal`), `serviceName`, `genaiOp`. Sorted by `startTime` desc, capped at 200 rows."
+    },
+    {
+      "name": "traces_queue-time",
+      "description": "For one trace, compute the gap between each parent span finishing and its child starting (= queue/wait time). Pass `dataSourceId` and `traceId`; optional `dataset` (defaults to `otel-v1-apm-span-*`). Loads up to 500 spans and shows top-50 parent\u2192child gaps by descending wait time."
+    },
+    {
+      "name": "traces_sync-selection",
+      "description": "Static reference: documents the `traces:span-selected` CustomEvent bus contract used to keep span selection in sync across the Tree / DAG / Gantt views in the Traces app."
+    },
+    {
+      "name": "traces_copy-id",
+      "description": "Static reference: how the trace UI exposes 'Copy trace ID' \u2014 the header chip clipboard target, the suggested `Cmd/Ctrl+Shift+C` keyboard shortcut, and the `/app/observability-traces#/?traceId=<id>` OSD deep-link pattern."
+    },
+    {
+      "name": "traces_lazy-load",
+      "description": "Static reference: documents the OnDemandChildLoader pattern for lazy-loading child spans in a large trace tree."
+    },
+    {
+      "name": "logs_explore",
+      "description": "Query an OpenSearch logs index with PPL and render a fielded log table with severity highlighting. Pass `dataSourceId` (from `list_data_sources`) and `dataset` (the logs index pattern title \u2014 discover via `list_index_patterns`). Optionally supply `query` (the PPL chain after `source = <dataset>`, e.g. `where severity = \"ERROR\"`) and `limit` (default 200)."
+    },
+    {
+      "name": "logs_severity-filter",
+      "description": "Load the most recent logs filtered by severity. Pass `dataSourceId` (from `list_data_sources`), `dataset` (logs index pattern title \u2014 discover via `list_index_patterns`), and `severity` (`error`|`warn`|`info`|`debug`|`any`). Optional `limit` (default 200)."
+    },
+    {
+      "name": "logs_by-trace",
+      "description": "Load logs scoped to a specific OpenTelemetry traceId or spanId. Pass `dataSourceId` (from `list_data_sources`), `dataset` (logs index pattern title \u2014 discover via `list_index_patterns`), and at least one of `traceId` or `spanId`. Optional `limit` (default 200)."
+    },
+    {
+      "name": "logs_histogram",
+      "description": "Render a log volume histogram over time using PPL `span()` bucketing. Pass `dataSourceId` (from `list_data_sources`), `dataset` (logs index pattern title \u2014 discover via `list_index_patterns`). Optional `intervalMinutes` (default 5) and `severity` filter (`error`|`warn`|`info`|`debug`|`any`)."
+    },
+    {
+      "name": "logs_viz-switch",
+      "description": "Static reference of supported visualization types and which axes, legend, and threshold settings each one supports. Invoke when the user asks what viz types are available or which one to pick."
+    },
+    {
+      "name": "logs_save-query",
+      "description": "Reference panel: how to persist a PPL log query as a `query` saved object. Documents the payload shape, the `/api/saved_objects/query` endpoint, and the OSD UI path. Includes a sample `errors-only-last-1h` payload."
+    },
+    {
+      "name": "log-patterns_top",
+      "description": "Cluster log lines into the top recurring patterns using PPL `| patterns`. Required args: `dataSourceId` (from `list_data_sources`), `dataset` (logs index pattern title \u2014 discover via `list_index_patterns`, e.g. `logs-otel-v1-*`), and `patternsField` (the long log-body field, typically `body`, `message`, or `log`). Optional: `filter` (PPL chain inserted before `| patterns`, e.g. `where severity = \"ERROR\"`), `method` (`brain` (default) or `regex`), and `limit` (default 50)."
+    },
+    {
+      "name": "log-patterns_rare",
+      "description": "Surface the rarest recurring log patterns using PPL `| patterns` with ascending sort by count. Pass `dataSourceId` (from `list_data_sources`), `dataset` (logs index pattern title \u2014 discover via `list_index_patterns`), and `patternsField` (typically `body`, `message`, or `log`). Optional: `filter` (PPL chain inserted before `| patterns`), `method` (`brain` (default) or `regex`), and `limit` (default 30)."
+    },
+    {
+      "name": "log-patterns_change-detection",
+      "description": "Diff log patterns between an alert window and a baseline window. Runs `| patterns` twice and joins by pattern, computing delta = alert - baseline. Pass `dataSourceId`, `dataset`, `patternsField`, `alertStart`/`alertEnd`, and `baselineStart`/`baselineEnd` (all ISO 8601). Optional `method` and `limit` (default 200)."
+    },
+    {
+      "name": "services_catalog",
+      "description": "List services from a trace span index with RED-style KPIs (span count, error rate, avg/p50/p95/p99 latency). Pass `dataSourceId` (from `list_data_sources`) and `dataset` (the span index pattern, e.g. `otel-v1-apm-span-*` \u2014 discover via `list_index_patterns`); optionally override `limit` (default 50)."
+    },
+    {
+      "name": "services_catalog-filter",
+      "description": "Service catalog filtered by environment / latency / throughput / failure-ratio / SDK language. Computes the same RED-style KPIs as `services_catalog`. Applies environment / SDK language filters in PPL `where`, then post-filters on `minP99Ms`, `minSpans`, and `maxErrorRate`. Pass `dataSourceId` (from `list_data_sources`) and `dataset` (the span index pattern, e.g. `otel-v1-apm-span-*` \u2014 discover via `list_index_patterns`); optional `environment`, `minP99Ms`, `minSpans`, `maxErrorRate`, `sdkLanguage`, and `limit` (default 100)."
+    },
+    {
+      "name": "services_kpi-cards",
+      "description": "Render the 5 service KPI cards (throughput, fault rate, error rate, availability, p99 latency) for one service from a trace span index. Pass `dataSourceId` (from `list_data_sources`) and `serviceName`; optional `dataset` (the span index pattern title \u2014 discover via `list_index_patterns`, defaults to `otel-v1-apm-span-*`)."
+    },
+    {
+      "name": "services_latency-deps",
+      "description": "Latency percentile (p50/p90/p99) for one service grouped by downstream dependency (`attributes.peer.service`, falling back to `attributes.net.peer.name`). Pass `dataSourceId` (from `list_data_sources`) and `serviceName`; optional `dataset` (the span index pattern \u2014 discover via `list_index_patterns`, defaults to `otel-v1-apm-span-*`) and `percentile` (`50` | `90` | `99`, default `99`)."
+    },
+    {
+      "name": "services_requests-by-op",
+      "description": "Top-K operations of a service by request count. Pass `dataSourceId` (from `list_data_sources`) and `serviceName`; optional `dataset` (the span index pattern \u2014 discover via `list_index_patterns`, defaults to `otel-v1-apm-span-*`) and `topK` (`3` | `5` | `10`, default `5`)."
+    },
+    {
+      "name": "services_availability-ops",
+      "description": "Bottom-K operations of a service by availability (1 - error rate). Pass `dataSourceId` (from `list_data_sources`) and `serviceName`; optional `dataset` (the span index pattern \u2014 discover via `list_index_patterns`, defaults to `otel-v1-apm-span-*`) and `bottomK` (`3` | `5` | `10`, default `5`)."
+    },
+    {
+      "name": "services_operations",
+      "description": "Browse the operations of one service with per-operation request count, error count, error rate, avg/p50/p95/p99 latency. Pass `dataSourceId` (from `list_data_sources`) and `serviceName`; optional `dataset` (the span index pattern \u2014 discover via `list_index_patterns`, defaults to `otel-v1-apm-span-*`), `filter` (`minLatencyMs`, `maxErrorRate`, `search`), and `limit` (default 100)."
+    },
+    {
+      "name": "services_dependencies",
+      "description": "Browse the downstream dependencies of one service. Group key is `coalesce(attributes.peer.service, attributes.net.peer.name, attributes.db.system, attributes.messaging.system)`. Returns per-dependency call count, error count, error rate, and latency percentiles. Pass `dataSourceId` (from `list_data_sources`) and `serviceName`; optional `dataset` (the span index pattern \u2014 discover via `list_index_patterns`, defaults to `otel-v1-apm-span-*`) and `limit` (default 100)."
+    },
+    {
+      "name": "services_top-dep-paths",
+      "description": "Top-K (caller, callee) edges in the service map by fault rate (errorCount / requestCount). Pass `dataSourceId` (from `list_data_sources`); optional `dataset` (default `otel-v2-apm-service-map` \u2014 discover via `list_index_patterns`) and `limit` (default 20)."
+    },
+    {
+      "name": "services_correlation",
+      "description": "Correlate spans and logs for one operation. Runs two PPL queries: spans (`where serviceName=<svc> and name=<op>`) and logs (`where traceId in (<span trace ids>)`). Pass `dataSourceId` (from `list_data_sources`), `logsDataset`, `serviceName`, `operationName`; optional `spansDataset` (default `otel-v1-apm-span-*`), `traceId`, and `limit`."
+    },
+    {
+      "name": "services_compare-periods",
+      "description": "Compare a service's per-operation p99 latency across two time windows. Returns rows of `{op, w1_p99_ms, w2_p99_ms, deltaPct}` joined in JS by operation name. Pass `dataSourceId`, `serviceName`, `window1Start`/`window1End`, `window2Start`/`window2End`; optional `dataset` (default `otel-v1-apm-span-*`)."
+    },
+    {
+      "name": "services_status-codes",
+      "description": "Per-operation HTTP status code distribution (2xx / 3xx / 4xx / 5xx / other) for one service. Pass `dataSourceId` (from `list_data_sources`) and `serviceName`; optional `dataset` (the span index pattern \u2014 discover via `list_index_patterns`, defaults to `otel-v1-apm-span-*`) and `limit` (default 100)."
+    },
+    {
+      "name": "services_alert-prefill",
+      "description": "Pre-fill the service detail with the alert's evidence: 5 service KPIs (throughput, fault rate, error rate, availability, p99 latency) plus the most recent error spans (statusCode = 2) in the alert window. Pass `dataSourceId` (from `list_data_sources`) and `serviceName`; optional `alertId`, `since`, `until` (ISO 8601), and `dataset` (default `otel-v1-apm-span-*`)."
+    },
+    {
+      "name": "services_auto-refresh",
+      "description": "Static reference: the MCP renders read-only snapshots \u2014 to refresh a service detail panel, the chat host re-invokes the tool. Documents the recommended interval presets (10s, 30s, 1m, 5m, 15m, 1h, off) and shows an example client-side `setInterval` snippet."
+    },
+    {
+      "name": "alerts-dashboard_summary",
+      "description": "Aggregate alert volume by severity over a time range. Pass `dataSourceId` (from `list_data_sources`) and optional `timeRange` (1h, 24h, 7d, 30d; default 24h). Reads from `.opensearch-alerting-alert-history-*` via PPL."
+    },
+    {
+      "name": "alerts-dashboard_top-firing",
+      "description": "Find the noisiest OpenSearch alerting monitors by number of firings. Pass `dataSourceId` (from `list_data_sources`) and optional `limit` (default 20). Reads `.opensearch-alerting-alert-history-*` via PPL `stats count() by monitor_name`."
+    },
+    {
+      "name": "topology-map_view",
+      "description": "Load service map nodes and edges from the APM service-map index. Pass `dataSourceId` (from `list_data_sources`) and optional `dataset` (default `otel-v2-apm-service-map` \u2014 discover via `list_index_patterns`). Returns nodes (services) sorted by call count and edges (caller \u2192 callee)."
+    },
+    {
+      "name": "topology-map_filter-fault",
+      "description": "Filter service-map destination nodes by fault rate bucket: `lt1` (<1%), `1to5` (1%\u20135%), `gt5` (>5%). Pass `dataSourceId` (from `list_data_sources`), `bucket`, and optional `dataset` (default `otel-v2-apm-service-map`)."
+    },
+    {
+      "name": "topology-map_filter-error",
+      "description": "Filter service-map destination nodes by error rate bucket: `lt1` (<1%), `1to5` (1%\u20135%), `gt5` (>5%). Pass `dataSourceId` (from `list_data_sources`), `bucket`, and optional `dataset` (default `otel-v2-apm-service-map`)."
+    },
+    {
+      "name": "topology-map_filter-environment",
+      "description": "Filter the service-map by `attributes.deployment.environment`. Pass `dataSourceId` (from `list_data_sources`), `environment`, and optional `dataset` (default `otel-v2-apm-service-map`)."
+    },
+    {
+      "name": "topology-map_chip-filter",
+      "description": "Static reference panel documenting the topology-map filter-chip UX: example chips, how to remove them, and persistence behaviour. No data-source input."
+    },
+    {
+      "name": "topology-map_node-detail",
+      "description": "Side-detail panel for one service node on the topology map. Aggregates the span index for that service into requests, errors, faults, and p50/p90/p99 latency. Pass `dataSourceId` (from `list_data_sources`) and `serviceName`; optional `dataset` (default `otel-v1-apm-span-*` \u2014 discover via `list_index_patterns`)."
+    },
+    {
+      "name": "topology-map_group-cards",
+      "description": "Group the service-map by an attribute (e.g. `attributes.deployment.environment`, `resource.team`) and render a card grid where each card shows the group label and service count. Pass `dataSourceId` (from `list_data_sources`), `groupBy`, and optional `dataset` (default `otel-v2-apm-service-map`)."
+    },
+    {
+      "name": "topology-map_search",
+      "description": "Substring search on the service-map by service name. Pass `dataSourceId` (from `list_data_sources`), `query` (substring, case-insensitive), and optional `dataset` (default `otel-v2-apm-service-map`). Returns matched services and the edges that touch them, plus their immediate neighbours."
+    },
+    {
+      "name": "topology-map_drill",
+      "description": "Drill from a group attribute value into the set of services that belong to it. Pass `dataSourceId`, `groupAttribute` (e.g. `attributes.deployment.environment`), `groupValue`, and optional `dataset` (default `otel-v2-apm-service-map`). Returns the filtered subgraph as a node list and edge list."
+    },
+    {
+      "name": "anomaly-detection_list",
+      "description": "List OpenSearch anomaly detectors. Pass `dataSourceId` (from `list_data_sources`). Reads from `.opendistro-anomaly-detectors` via PPL."
+    },
+    {
+      "name": "anomaly-detection_create",
+      "description": "Static reference: required + optional fields for creating an OpenSearch anomaly detector and the relevant `_plugins/_anomaly_detection/detectors` endpoints."
+    },
+    {
+      "name": "anomaly-detection_mode",
+      "description": "Static reference comparing real-time and historical anomaly-detection modes with pros/cons and when to use each."
+    },
+    {
+      "name": "anomaly-detection_grade-chart",
+      "description": "Plot anomaly grade and confidence over time for one detector. Pass `dataSourceId` (from `list_data_sources`) and `detectorId` (from `anomaly-detection_list`); optional `intervalMinutes`."
+    },
+    {
+      "name": "anomaly-detection_feature-contribution",
+      "description": "Inspect feature-level contributions for one anomaly result. Pass `dataSourceId`, `detectorId`, and `anomalyId` (the result document `_id`)."
+    },
+    {
+      "name": "anomaly-detection_recipes",
+      "description": "Static reference: use-case \u2192 detector configuration recipes (latency / error / traffic / resource) with feature, aggregation, and interval suggestions."
+    },
+    {
+      "name": "anomaly-detection_alert-on-anomaly",
+      "description": "Static reference: how to wire `where anomaly_grade > 0.5` into an OpenSearch monitor with an example monitor JSON."
+    },
+    {
+      "name": "anomaly-detection_overlay",
+      "description": "Overlay anomaly grade with log volume from a logs index for visual correlation. Pass `dataSourceId`, `detectorId`, and `logsDataset` (logs index pattern title); optional `intervalMinutes` (default 5)."
+    },
+    {
+      "name": "anomaly-detection_historical",
+      "description": "Static reference for backtesting anomaly detectors via historical mode: detector config, run command, and how to score against known incidents."
+    },
+    {
+      "name": "forecasting_list",
+      "description": "List OpenSearch forecasters. Pass `dataSourceId` (from `list_data_sources`). Reads from `.opendistro-forecaster` via PPL."
+    },
+    {
+      "name": "forecasting_create",
+      "description": "Static reference: forecaster config form fields (features, horizon, interval) with an example POST body."
+    },
+    {
+      "name": "forecasting_predicted-values",
+      "description": "Plot forecast values with confidence-interval band for one forecaster. Pass `dataSourceId` (from `list_data_sources`) and `forecasterId` (from `forecasting_list`)."
+    },
+    {
+      "name": "forecasting_recipes",
+      "description": "Static catalog: use-case \u2192 forecaster recipe (capacity / storage / traffic / cost) with interval and horizon hints."
+    },
+    {
+      "name": "forecasting_alert-on-cross",
+      "description": "Static reference: how to alert when a forecaster's predicted value crosses a configured threshold (capacity / SLO)."
+    },
+    {
+      "name": "trace-dashboard_top-services",
+      "description": "Rank services by latency, error rate, or throughput from a trace span index. Pass `dataSourceId` (from `list_data_sources`) and optionally `dataset` (the span index pattern title \u2014 discover via `list_index_patterns`, defaults to `otel-v1-apm-span-*`) and `metric` (`latency` (default) | `error` | `throughput`)."
+    },
+    {
+      "name": "trace-dashboard_top-groups",
+      "description": "Rank arbitrary group-by attributes (e.g. `resource.environment`, `attributes.app.version`, `serviceName`) by trace count and p99 latency. Pass `dataSourceId` and `groupBy`. Optional `dataset` (default `otel-v1-apm-span-*`) and `limit` (default 20)."
+    },
+    {
+      "name": "spans_list",
+      "description": "Browse individual spans (not just trace roots) from a trace span index, sorted by duration. Pass `dataSourceId` (from `list_data_sources`); optional `dataset` (the span index pattern title \u2014 discover via `list_index_patterns`, defaults to `otel-v1-apm-span-*`), `status` (`error`|`ok`|`any`), `serviceName`, and `limit` (default 200)."
+    },
+    {
+      "name": "spans_exception-events",
+      "description": "List spans that contain an `exception` event. Pass `dataSourceId` (from `list_data_sources`); optional `dataset` (default `otel-v1-apm-span-*`), `serviceName`, and `limit` (default 100)."
+    },
+    {
+      "name": "spans_span-links",
+      "description": "List spans that have one or more `links` to other spans/traces. Pass `dataSourceId`. Optional `dataset` (default `otel-v1-apm-span-*`), `traceId`, and `limit` (default 100). Falls back to `links != \"\"` if `array_length` is unsupported."
+    },
+    {
+      "name": "apm-traces_list",
+      "description": "List recent root traces for a single service from a trace span index. Pass `dataSourceId` (from `list_data_sources`) and `serviceName`; optional `dataset` (the span index pattern title \u2014 discover via `list_index_patterns`, defaults to `otel-v1-apm-span-*`)."
+    },
+    {
+      "name": "apm-traces_error-types",
+      "description": "Group error spans (statusCode = 2) for a service by `error.type` and count occurrences. Pass `dataSourceId` and `serviceName`; optional `dataset` (defaults `otel-v1-apm-span-*`) and `limit` (default 20)."
+    },
+    {
+      "name": "apm-traces_remote-callees",
+      "description": "List the remote callees of a service from its client-kind spans. Coalesces across `peer.service`, `server.address`, `net.peer.name`, `http.host`, `db.name`, `messaging.destination.name`, and `rpc.service`. Pass `dataSourceId` (from `list_data_sources`) and `serviceName`; optional `dataset` (the span index pattern, defaults to `otel-v1-apm-span-*`) and `limit` (default 50). Falls back to a per-attribute merge if PPL `coalesce` isn't supported."
+    },
+    {
+      "name": "apm-red_compute",
+      "description": "Compute RED metrics (rate, error ratio, p50/p95/p99 latency) bucketed over time for a single service from a trace span index. Pass `dataSourceId` (from `list_data_sources`) and `serviceName`; optional `dataset` (the span index pattern title \u2014 discover via `list_index_patterns`, defaults to `otel-v1-apm-span-*`) and `bucketSize` (`1m` | `5m` (default) | `1h`)."
+    },
+    {
+      "name": "apm-red_variant-picker",
+      "description": "Static reference enumerating the four metric variants \u2014 OTel SDK, Data Prepper, spanmetrics, GenAI \u2014 with the canonical metric name and label set for each. No inputs."
+    },
+    {
+      "name": "apm-red_top-ops-by-fault",
+      "description": "Rank a service's operations by fault rate (statusCode = 2). Pass `dataSourceId` and `serviceName`; optional `dataset` (defaults `otel-v1-apm-span-*`) and `limit` (default 10)."
+    },
+    {
+      "name": "apm-red_bottom-availability",
+      "description": "List services with the worst availability (`availability = 1 - fault_rate`). Pass `dataSourceId`; optional `dataset` (defaults `otel-v1-apm-span-*`) and `limit` (default 10). Sorts ascending by availability so the worst service appears at the top."
+    },
+    {
+      "name": "apm-red_genai-filters",
+      "description": "Static reference for the standard GenAI filter dimensions (`gen_ai.agent.name`, `gen_ai.system`, `gen_ai.request.model`) with sample PPL `where` clauses. No inputs."
+    },
+    {
+      "name": "apm-red_genai-tokens",
+      "description": "Aggregate GenAI input / output token usage by model or agent. Pass `dataSourceId`; optional `dataset` (defaults `otel-v1-apm-span-*`), `groupBy` (`model` (default) | `agent`), and `limit` (default 10)."
+    },
+    {
+      "name": "metrics-browser_list",
+      "description": "List metric names on a Prometheus data source. Pass `dataSourceId` (a Prometheus data source id from `list_data_sources` \u2014 companion catalog tools like `list_index_patterns` cover OpenSearch index patterns; this tool targets Prometheus). NOTE: a Prometheus client is not yet wired in this build, so this returns an empty catalog and a notice."
+    },
+    {
+      "name": "metrics-browser_label-filter",
+      "description": "Static reference for the four PromQL label matchers (`=`, `!=`, `=~`, `!~`) with examples and usage notes. No inputs."
+    },
+    {
+      "name": "metrics-browser_group-toggle",
+      "description": "Static reference for how the metrics catalog can be grouped (prefix / A\u2013Z / cardinality) and laid out (grid / rows). No inputs."
+    },
+    {
+      "name": "metrics-browser_type-badges",
+      "description": "Static reference for the four Prometheus metric types (Counter / Gauge / Histogram / Summary) with definitions, valid PromQL operators, and one example each. No inputs."
+    },
+    {
+      "name": "metrics-browser_drill",
+      "description": "Reference page for drilling into a single metric's label combinations. Optional `dataSourceId` and `metricName` are echoed into example URL + PromQL. NOTE: the Prometheus client is not wired in this build, so this returns a static reference instead of running a query."
+    },
+    {
+      "name": "metrics-view_query",
+      "description": "Render a PromQL query against a Prometheus-attached data source. Pass `dataSourceId` (a Prometheus data source id from `list_data_sources` \u2014 use companion catalog tools like `list_index_patterns` to discover other surfaces) and the PromQL `query` string; optionally pass `dataset`. NOTE: PromQL execution is not wired in this build \u2014 the tool surfaces the query for review rather than running it."
+    },
+    {
+      "name": "metrics-view_multi-query",
+      "description": "Reference card for rendering multiple PromQL expressions on one chart. Pass `dataSourceId` and `queries: string[]`. NOTE: PromQL execution is not wired in this build \u2014 the tool surfaces queries side-by-side and documents the binary / set operators (`or`, `and`, `unless`, arithmetic, comparison) used to compose them."
+    },
+    {
+      "name": "metrics-view_latest-values",
+      "description": "List the latest value of each label-combination series for a metric. Pass `dataSourceId` and `metricName`; optional `dataset` (defaults to `prometheus.metrics`) and `limit` (defaults to 50). Falls back to `stats max(@timestamp), avg(value)` grouping when the index doesn't expose per-row labels \u2014 if the index doesn't exist, returns an empty list with the failed PPL surfaced for review."
+    },
+    {
+      "name": "metrics-view_series-limit",
+      "description": "Static reference explaining why the metrics view caps series count by default and how to raise it. No inputs."
+    },
+    {
+      "name": "metrics-view_time-filter",
+      "description": "Static reference for the time-filter widget's Quick / Commonly used / Custom / Auto-refresh presets. No inputs."
+    },
+    {
+      "name": "metrics-view_add-to-dashboard",
+      "description": "Static reference describing the saved-object payload for promoting a metrics view to a dashboard. No inputs."
+    },
+    {
+      "name": "metrics-view_exemplars",
+      "description": "Static reference for how a metric exemplar maps into the traces app, including the OSD URL pattern. No inputs."
+    },
+    {
+      "name": "index-patterns-admin_list",
+      "description": "List index patterns scoped to a data source. Pass `dataSourceId` (from `list_data_sources`); without it, returns an empty list with a hint."
+    },
+    {
+      "name": "index-patterns-admin_field-mappings",
+      "description": "List the field name + type for an index pattern using PPL `describe`. Pass `dataSourceId` (from `list_data_sources`) and `indexPattern` (title \u2014 discover via `list_index_patterns`)."
+    },
+    {
+      "name": "index-patterns-admin_cat-indices",
+      "description": "List the raw cluster indices visible to a data source via `_cat/indices`. Pass `dataSourceId` (from `list_data_sources`)."
+    },
+    {
+      "name": "index-patterns-admin_signal-badges",
+      "description": "List index patterns and tag each with its signal type (traces / logs / metrics / other) based on the title. Pass `dataSourceId` (from `list_data_sources`)."
+    },
+    {
+      "name": "index-patterns-admin_create",
+      "description": "Reference panel: how to create an OSD index pattern. Documents the saved-object payload shape (`type: \"index-pattern\"`, `attributes: { title, timeFieldName }`), the OSD UI URL, and the REST endpoint, with example payloads for logs, traces, and metrics."
+    },
+    {
+      "name": "agent-traces_list",
+      "description": "List recent GenAI agent traces (root spans where `attributes.gen_ai.system` is set). Pass `dataSourceId` (from `list_data_sources`) and optionally `dataset` (defaults to `otel-v1-apm-span-*`)."
+    },
+    {
+      "name": "agent-traces_spans",
+      "description": "List individual GenAI spans across all agent traces (any span where `attributes.gen_ai.system` is set), sorted by recency. Pass `dataSourceId` (from `list_data_sources`); optionally `dataset` (defaults to `otel-v1-apm-span-*`) and `limit` (default 200)."
+    },
+    {
+      "name": "agent-traces_metrics",
+      "description": "Aggregate KPI snapshot for the gen_ai-instrumented span set: Total Traces / Total Spans / Total Tokens / P50 / P99 duration. Pass `dataSourceId` (from `list_data_sources`); optionally `dataset` (defaults to `otel-v1-apm-span-*`) and `since` (ISO8601 lower bound)."
+    },
+    {
+      "name": "agent-traces_tree",
+      "description": "Tree view of one agent trace with `SpanCategoryBadge` colors per gen_ai operation. Pass `dataSourceId`, `dataset` (e.g. `otel-v1-apm-span-*`), and `traceId`; optionally `limit` (default 500)."
+    },
+    {
+      "name": "agent-traces_dag",
+      "description": "DAG view of one agent trace as nodes-and-edges. Supports CSS-transform zoom (0.1x\u20132x), fit-to-screen, minimap toggle, and ERR badges on errored nodes (statusCode=2). Pass `dataSourceId`, `dataset` (e.g. `otel-v1-apm-span-*`), and `traceId`; optionally `limit` (default 500)."
+    },
+    {
+      "name": "agent-traces_gantt",
+      "description": "Gantt timeline of one agent trace, with one row per span colored by gen_ai operation category. Pass `dataSourceId`, `dataset` (e.g. `otel-v1-apm-span-*`), and `traceId`; optionally `limit` (default 500)."
+    },
+    {
+      "name": "agent-traces_category-badge",
+      "description": "Static reference page documenting the SpanCategoryBadge color key (Agent / LLM / Content / Tool / Embeddings / Retrieval / Other) and the gen_ai.operation.name patterns that map to each."
+    },
+    {
+      "name": "agent-traces_sync-selection",
+      "description": "Static reference: documents the `agent-traces:span-selected` CustomEvent bus contract used to keep span selection in sync across the Tree / DAG / Gantt views."
+    },
+    {
+      "name": "agent-traces_lazy-load",
+      "description": "Static reference: documents the OnDemandChildLoader pattern for lazy-loading child spans in a large agent trace tree."
+    },
+    {
+      "name": "agent-traces_tool-calls",
+      "description": "List all spans in a trace where `attributes.gen_ai.tool.name` is set, with one card per call showing name / call_id / arguments / result. Pass `dataSourceId`, `dataset` (e.g. `otel-v1-apm-span-*`), and `traceId`."
+    },
+    {
+      "name": "agent-traces_exception-events",
+      "description": "List span events of name `exception` from agent spans, rendered as stacktrace cards. Pass `dataSourceId`, `dataset` (e.g. `otel-v1-apm-span-*`); optionally `traceId` to scope to one trace."
+    },
+    {
+      "name": "agent-traces_attributes",
+      "description": "Inspect raw + formatted attributes for a single span (looked up by `spanId`). Pass `dataSourceId`, `dataset` (e.g. `otel-v1-apm-span-*`), and `spanId`."
+    },
+    {
+      "name": "agent-traces_op-duration",
+      "description": "Compute P50 / P95 / P99 of `durationInNanos` grouped by `gen_ai.operation.name` (when `groupBy='operation'`) or `gen_ai.request.model` (when `groupBy='model'`). Pass `dataSourceId`, `dataset` (e.g. `otel-v1-apm-span-*`), and `groupBy`."
+    },
+    {
+      "name": "agent-traces_conversation-groups",
+      "description": "Group agent traces by `attributes.gen_ai.conversation.id` and return per-conversation trace count, span count, total tokens, and first / last seen timestamps. Pass `dataSourceId` (from `list_data_sources`); optional `dataset` (default `otel-v1-apm-span-*` \u2014 discover via `list_index_patterns`) and `limit` (default 50)."
+    },
+    {
+      "name": "agent-traces_token-usage",
+      "description": "Sum input + output tokens per model (`attributes.gen_ai.request.model`) and render a stacked horizontal bar chart. Pass `dataSourceId` (from `list_data_sources`); optional `dataset` (default `otel-v1-apm-span-*` \u2014 discover via `list_index_patterns`) and `limit` (default 25)."
+    },
+    {
+      "name": "agent-live-tail_view",
+      "description": "Snapshot of the 20 most recent root spans. Pass `dataSourceId` (from `list_data_sources`) and optionally `dataset` (defaults to `otel-v1-apm-span-*`). Re-invoke this tool to refresh \u2014 there is no real streaming."
+    },
+    {
+      "name": "agent-live-tail_agent-filter",
+      "description": "Snapshot of the 50 most recent spans where `attributes.gen_ai.agent.name` matches the given `agentName`. Pass `dataSourceId` (from `list_data_sources`) and `agentName`; optionally `dataset` (defaults to `otel-v1-apm-span-*`). Re-invoke to refresh \u2014 there is no streaming."
+    },
+    {
+      "name": "agent-live-tail_span-search",
+      "description": "Search the most recent spans by free-form text against `name` and `attributes.gen_ai.tool.name` via PPL `like(...)`. Pass `dataSourceId` (from `list_data_sources`) and `query`; optionally `dataset` (defaults to `otel-v1-apm-span-*`). The query is sanitized \u2014 non-alphanumeric / non-`._-/ ` characters are stripped."
+    },
+    {
+      "name": "agent-live-tail_maximize",
+      "description": "Static reference: documents how a trace or live-tail view requests full-screen display via the host's `requestDisplayMode` API."
+    },
+    {
+      "name": "agent-live-tail_compare",
+      "description": "Side-by-side trace comparison. Pass `dataSourceId`, `dataset` (e.g. `otel-v1-apm-span-*`), `traceIdA`, and `traceIdB`; optionally `mode` (`aligned` | `merged`, default `aligned`) and `orientation` (`horizontal` | `vertical`, default `horizontal`)."
+    },
+    {
+      "name": "agent-doctor_report",
+      "description": "Static checklist of agent-stack health categories (Config / AWS Credentials / Agents / OpenSearch Storage / OpenSearch Observability). No live probing is performed."
+    },
+    {
+      "name": "agent-doctor_init-project",
+      "description": "Static reference: walks through `agent-health init` and the minimum config needed before `agent-health doctor` and the evaluator can run."
+    },
+    {
+      "name": "agent-doctor_migrate",
+      "description": "Static reference: documents the old (inline `stats`) vs new (per-trace `EvalScore`) shape and the `agent-health migrate-stats` CLI."
+    },
+    {
+      "name": "eval-integration-recipes_list",
+      "description": "Static catalog of evaluator integrations (DeepEval / RAGAS / MLflow / pytest) with one-line descriptions."
+    },
+    {
+      "name": "apm-config_wizard",
+      "description": "Reference panel: 5-step APM setup wizard. Covers traces dataset, services index pattern, RED metrics datasource, service map processor, and verification."
+    },
+    {
+      "name": "apm-config_settings-modal",
+      "description": "Reference panel: the APM Settings modal. Documents the three settings it edits (Traces dataset, Services index pattern, RED Metrics datasource), their defaults, and where they are persisted (saved-object type `APM-Config`)."
+    },
+    {
+      "name": "telemetry-ingestion-config_reference",
+      "description": "Reference panel: example OTel Collector and Data Prepper pipeline YAMLs for ingesting traces and logs."
+    },
+    {
+      "name": "telemetry-ingestion-config_otel-yaml",
+      "description": "Reference panel: example OpenTelemetry Collector config with receivers, processors, and exporters wired for traces / logs / metrics."
+    },
+    {
+      "name": "telemetry-ingestion-config_data-prepper-yaml",
+      "description": "Reference panel: example Data Prepper pipelines for traces (with otel_apm_service_map) and logs, sinking to OpenSearch."
+    },
+    {
+      "name": "telemetry-ingestion-config_service-map-processor",
+      "description": "Reference panel: configuration for the otel_apm_service_map processor (window_duration, group_by_attributes) used to derive service-map edges in Data Prepper."
+    },
+    {
+      "name": "telemetry-ingestion-config_verification",
+      "description": "Reference panel: end-to-end ingestion verification \u2014 indices land, Prometheus targets healthy, and the APM UI shows data."
+    },
+    {
+      "name": "telemetry-ingestion-config_index-names",
+      "description": "Reference table of canonical observability index patterns and what writes to them: traces (otel-v1-apm-span-*), service map (otel-v2-apm-service-map), logs (logs-otel-v1-*), and the Simple Schema variants."
+    },
+    {
+      "name": "sizing-calculator_compute",
+      "description": "Compute trace storage estimates from traces-per-day, avg spans-per-trace, and avg span byte size. Returns daily span / RED metrics / service map volume and 30-day total."
+    },
+    {
+      "name": "sizing-calculator_assumptions",
+      "description": "Reference panel: what each input to the sizing calculator means, the assumptions baked into the totals, and right-sizing tips for storage, retention, and sampling."
+    },
+    {
+      "name": "mcp-server-config_reference",
+      "description": "Reference panel: how to enable the built-in OpenSearch MCP server, supported transports, and the tool catalog it exposes."
+    },
+    {
+      "name": "mcp-server-config_enable",
+      "description": "Reference panel: how to enable OpenSearch's built-in MCP server in opensearch.yml, choose a transport (stdio / http), and notes on auth and TLS."
+    },
+    {
+      "name": "mcp-server-config_categories",
+      "description": "Reference panel: tool categories exposed by the OpenSearch built-in MCP server (Index ops / PPL / SQL / Cluster info) and the canonical tools in each."
+    },
+    {
+      "name": "mcp-server-config_examples",
+      "description": "Reference panel: use-case recipes for each MCP tool exposed by the OpenSearch built-in MCP server. Each row shows a natural-language prompt and the call shape an agent would make."
+    },
+    {
+      "name": "stack-health_check",
+      "description": "Stack health summary. Returns the canonical port reference and component placeholders. If `dataSourceId` is supplied, also lists indices via `_cat/indices`."
+    },
+    {
+      "name": "stack-health_service-logs",
+      "description": "Reference panel: docker-compose log-tail commands for each stack component (OpenSearch / OSD / OTel Collector / Data Prepper / Prometheus). Use to read what failed when a component is unhealthy."
+    },
+    {
+      "name": "stack-health_runbook",
+      "description": "Reference panel: failure-mode runbook flyout for the four canonical stack failure modes (OS unreachable / no data / Data Prepper errors / OTel exporter failures), each with diagnosis steps."
+    },
+    {
+      "name": "stack-health_doc-counts",
+      "description": "Confirm trace, service-map, and log documents are landing. Runs `source = <ds> | stats count()` against the three canonical index patterns in parallel and renders a KPI card per signal. Pass `dataSourceId` (from `list_data_sources`); optional `tracesDataset` (default `otel-v1-apm-span-*`), `serviceMapDataset` (default `otel-v2-apm-service-map`), and `logsDataset` (default `logs-otel-v1-*`)."
+    },
+    {
+      "name": "stack-quickstart_tutorial",
+      "description": "Reference panel: 5-minute quickstart for sending your first trace and building your first dashboard."
+    },
+    {
+      "name": "stack-quickstart_first-trace",
+      "description": "Reference panel: 5-minute walkthrough for sending your first OpenTelemetry trace via curl, verifying the span landed in OpenSearch, and opening it in Trace Analytics."
+    },
+    {
+      "name": "stack-quickstart_first-dashboard",
+      "description": "Reference panel: 5-minute walkthrough for building your first dashboard with two panels (top services by span count, error spans over time)."
+    },
+    {
+      "name": "core-concepts_glossary",
+      "description": "Reference panel: stack architecture pipeline, glossary of observability terms, and common index patterns."
+    },
+    {
+      "name": "core-concepts_architecture",
+      "description": "Reference panel: ASCII architecture diagram (Instrumentation \u2192 Collection \u2192 Processing \u2192 Storage \u2192 Visualization) with examples and a one-line description per stage."
+    },
+    {
+      "name": "core-concepts_index-patterns",
+      "description": "Reference table of common observability index patterns: logs-*, otel-v1-apm-span-*, otel-v2-apm-service-map, .opensearch-alerting-*, and the Simple Schema variants."
+    },
+    {
+      "name": "correlation-walkthrough_stepper",
+      "description": "Reference panel: numbered steps for one of three cross-signal investigations \u2014 metric-spike, error-log, or slow-agent. Pass `flow` to pick."
+    },
+    {
+      "name": "correlation-walkthrough_evidence-board",
+      "description": "Reference panel: conventions for collecting alert / span / log evidence into a shared investigation board. There is no built-in evidence-board; the panel documents the saved-search, tagged-saved-object, and markdown-via-webhook patterns and shows three deep-link shapes (alert / span / log)."
+    },
+    {
+      "name": "correlation-walkthrough_service-pull",
+      "description": "Pull spans and (optionally) logs for one `serviceName` in parallel. Pass `dataSourceId`, `serviceName`, optional `spansDataset` (default `otel-v1-apm-span-*`), optional `logsDataset`, and optional `since` (ISO). Metrics aren't PPL-queryable; the panel surfaces a hint pointing to the metrics-view app for PromQL."
+    },
+    {
+      "name": "panel-inspect_diagnose",
+      "description": "Reference panel: maps panel symptoms (no-results, syntax-error, timeout, wrong-data, slow) to likely causes and fixes."
+    },
+    {
+      "name": "panel-inspect_inspect-flyout",
+      "description": "Reference panel: Inspect flyout tabs (Data / Request / Response) and the payload shape on each tab."
+    },
+    {
+      "name": "dashboard-build_editor",
+      "description": "Reference panel: list of supported visualization types, bucket types, and value aggregations for dashboard panels."
+    },
+    {
+      "name": "dashboard-build_create",
+      "description": "Reference panel: how to create a dashboard via the saved-objects API. Documents the payload shape (attributes, references, panelsJSON)."
+    },
+    {
+      "name": "dashboard-build_add-panel",
+      "description": "Reference panel: how to add a panel to a dashboard \u2014 `Create new` vs `Add existing` (from library), and the panel descriptor shape."
+    },
+    {
+      "name": "dashboard-build_query-editor",
+      "description": "Reference panel: PPL vs PromQL panel queries with examples. Documents which language is used per data-source type."
+    },
+    {
+      "name": "dashboard-build_axes-legend",
+      "description": "Reference panel: configurable axes, legend, threshold steps, and unit selection for time-series and metric panels."
+    },
+    {
+      "name": "dashboard-build_bucket-config",
+      "description": "Reference panel: bucket Type / Interval / Bucket Size / Bucket Count / Min doc count / Order / Size semantics for grouped panels."
+    },
+    {
+      "name": "dashboard-build_value-calc",
+      "description": "Reference panel: every supported value aggregation (Last/Last*/First/First*/Min/Max/Mean/Median/Variance/Count/Distinct count/Total) and what each computes."
+    },
+    {
+      "name": "dashboard-build_value-mapping",
+      "description": "Reference panel: value mapping (raw \u2192 label + color) for metric / table / gauge panels. Documents match types and evaluation order."
+    },
+    {
+      "name": "dashboard-build_variable-ref",
+      "description": "Reference panel: `$var` substitution rules in panel queries \u2014 formats (csv, singlequote, doublequote, json, regex) and adjacency syntax."
+    },
+    {
+      "name": "dashboard-build_grid",
+      "description": "Reference panel: dashboard grid model (48-column snap, x/y/w/h/i fields, drag / resize / collision rules)."
+    },
+    {
+      "name": "dashboard-share_reference",
+      "description": "Reference panel: supported share / export formats for dashboards (URL, snapshot, PDF, PNG, CSV, JSON)."
+    },
+    {
+      "name": "dashboard-share_save-to-dashboard",
+      "description": "Reference panel: payload shape for promoting a saved visualization into a dashboard (panelsJSON append + reference)."
+    },
+    {
+      "name": "dashboard-share_share-menu",
+      "description": "Reference panel: URL vs Snapshot share modes for dashboards. Documents trade-offs and when to use each."
+    },
+    {
+      "name": "dashboard-share_export-formats",
+      "description": "Reference panel: dashboard / panel export formats \u2014 PDF, PNG, CSV, JSON \u2014 with scope and rendering notes."
+    },
+    {
+      "name": "dashboard-share_import-flow",
+      "description": "Reference panel: how to import a dashboard JSON via the saved-objects `_import` API, including conflict-resolution modes."
+    },
+    {
+      "name": "variables_reference",
+      "description": "Reference panel: dashboard variable types (Query, Custom, Constant, Interval, Data source, Text box) with short descriptions."
+    },
+    {
+      "name": "variables_query-variable",
+      "description": "Reference panel: Query variable form (data source / query / regex / refresh trigger / sort) for dashboard variables."
+    },
+    {
+      "name": "variables_custom-variable",
+      "description": "Reference panel: Custom (static) variable form. Documents options syntax (`label : value`), max 100 entries, multi-select, and include-all."
+    },
+    {
+      "name": "variables_variable-config",
+      "description": "Reference panel: shared variable configuration options \u2014 name, label, multi-select, include-all, sort, hide."
+    },
+    {
+      "name": "variables_chained",
+      "description": "Reference panel: dependent (chained) variable wiring with a 3-step example (cluster \u2192 namespace \u2192 service)."
+    },
+    {
+      "name": "variables_preview",
+      "description": "Reference panel: behavior of the variable preview pane (live re-render, 25-row sample, regex highlight, manual refresh, error surfacing)."
+    },
+    {
+      "name": "transformations_reference",
+      "description": "Reference panel: post-query transform pipeline operations (Limit, Filter, FilterFields, Sort, AddField, GroupBy, ExtractFields, ConvertFieldType)."
+    },
+    {
+      "name": "transformations_pipeline",
+      "description": "Reference panel: full transform pipeline (Limit / Filter / FilterFields / Sort / AddField / GroupBy / ExtractFields / ConvertFieldType) plus toggle and reorder semantics."
+    },
+    {
+      "name": "query-troubleshoot_diagnose",
+      "description": "Reference panel: diagnoses common PPL and PromQL query problems and links each symptom to a fix. Pass `kind` to filter to one language."
+    },
+    {
+      "name": "query-troubleshoot_request-payload",
+      "description": "Reference panel: the raw HTTP request payloads to `/_plugins/_ppl` and `/_plugins/_query`, with example bodies for debugging. Static."
+    },
+    {
+      "name": "_template_hello",
+      "description": "Trivial template route used to validate the MCP App framework contract. Returns a greeting."
+    },
+    {
+      "name": "list_domains",
+      "description": "List AWS OpenSearch domains visible to the configured AWS credentials in the current region. Returns each domain's endpoint hostname (use this as `dataSourceId` on query tools), name, region, and engine version. Replaces the legacy `list_data_sources` tool."
+    },
+    {
+      "name": "list_data_sources",
+      "description": "Alias for `list_domains`. Lists AWS OpenSearch domains in the configured region."
+    },
+    {
+      "name": "list_index_patterns",
+      "description": "List indices on a chosen OpenSearch domain. Use this to discover the `dataset` value to pass to query tools (e.g. `otel-v1-apm-span-*`, `logs-otel-v1-*`). Pass `dataSourceId` (a domain endpoint hostname) from `list_domains`."
+    }
+  ]
+}

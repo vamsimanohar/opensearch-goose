@@ -1,0 +1,1 @@
+Use this to look up the raw HTTP request payload shape for `/_plugins/_ppl` and `/_plugins/_query`, with example bodies for reproducing a failing query outside of OpenSearch Dashboards. Reference only.
