@@ -8,6 +8,10 @@ pub mod paths;
 pub mod permission;
 pub mod providers;
 pub mod search_path;
+#[cfg(feature = "aws-providers")]
+pub mod signup_amazon_midway;
+#[cfg(feature = "aws-providers")]
+pub mod signup_aws_idc;
 pub mod signup_nanogpt;
 pub mod signup_openrouter;
 pub mod signup_tetrate;

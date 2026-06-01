@@ -25,7 +25,7 @@ use super::formats::bedrock::{
 };
 use crate::session_context::SESSION_ID_HEADER;
 
-const BEDROCK_PROVIDER_NAME: &str = "aws_bedrock";
+pub const BEDROCK_PROVIDER_NAME: &str = "aws_bedrock";
 pub const BEDROCK_DOC_LINK: &str =
     "https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html";
 

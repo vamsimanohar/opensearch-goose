@@ -36,6 +36,9 @@ aws-providers = [
     "dep:aws-smithy-types",
     "dep:aws-sdk-bedrockruntime",
     "dep:aws-sdk-sagemakerruntime",
+    "dep:aws-sdk-ssooidc",
+    "dep:aws-sdk-sso",
+    "dep:aws-sdk-sts",
     "dep:smithy-transport-reqwest",
 ]
 cuda = ["local-inference", "candle-core/cuda", "candle-nn/cuda", "llama-cpp-2/cuda"]
@@ -144,6 +147,13 @@ smithy-transport-reqwest = { version = "0.1", default-features = false, features
 
 # For SageMaker TGI provider (optional, behind "aws-providers" feature)
 aws-sdk-sagemakerruntime = { version = "1.64", default-features = false, features = ["rt-tokio"], optional = true }
+
+# For AWS IAM Identity Center (IDC) login flow (optional, behind "aws-providers" feature)
+aws-sdk-ssooidc = { version = "1", default-features = false, features = ["rt-tokio"], optional = true }
+aws-sdk-sso = { version = "1", default-features = false, features = ["rt-tokio"], optional = true }
+
+# For "Default AWS credentials" probe and Midway/Amazon-internal flow
+aws-sdk-sts = { version = "1", default-features = false, features = ["rt-tokio"], optional = true }
 
 # For GCP Vertex AI provider auth
 jsonwebtoken = { version = "10.2", default-features = false, features = ["use_pem"] }
