@@ -25,6 +25,8 @@ export type ActionRequiredData = {
     user_data: unknown;
 };
 
+export type AdaProvider = 'isengard' | 'conduit';
+
 export type Annotations = {
     audience?: Array<Role>;
     lastModified?: string;
@@ -39,6 +41,40 @@ export type Author = {
 export type AuthorRequest = {
     contact?: string | null;
     metadata?: string | null;
+};
+
+export type AwsDefaultProbeResponse = {
+    /**
+     * Stripped form of the IAM caller arn, e.g. "arn:aws:sts::123:assumed-role/Admin/...".
+     */
+    identity?: string | null;
+    message: string;
+    success: boolean;
+};
+
+export type AwsIdcCompleteRequest = {
+    account_id: string;
+    account_name?: string | null;
+    role_name: string;
+};
+
+export type AwsIdcStartRequest = {
+    region: string;
+    start_url: string;
+};
+
+export type AwsIdcStartResponse = {
+    /**
+     * Number of accounts available after sign-in. UI uses this to skip the
+     * picker when there is exactly one.
+     */
+    account_count?: number | null;
+    /**
+     * Auto-populated when there is exactly one account.
+     */
+    auto_account_id?: string | null;
+    message: string;
+    success: boolean;
 };
 
 export type CallToolRequest = {
@@ -69,16 +105,6 @@ export type ChatRequest = {
     recipe_version?: string | null;
     session_id: string;
     user_message: Message;
-};
-
-export type ChatTemplate = {
-    type: 'embedded';
-} | {
-    name: string;
-    type: 'builtin';
-} | {
-    template: string;
-    type: 'custom_inline';
 };
 
 export type CheckProviderRequest = {
@@ -256,7 +282,7 @@ export type DeleteRecipeRequest = {
     id: string;
 };
 
-export type DictationProvider = 'openai' | 'elevenlabs' | 'groq' | 'local';
+export type DictationProvider = 'openai' | 'elevenlabs' | 'groq';
 
 export type DictationProviderStatus = {
     /**
@@ -283,13 +309,6 @@ export type DictationProviderStatus = {
      * Whether this provider uses the main provider config (true) or has its own key (false)
      */
     uses_provider_config: boolean;
-};
-
-export type DownloadModelRequest = {
-    /**
-     * Model spec like "bartowski/Llama-3.2-3B-Instruct-GGUF:Q4_K_M"
-     */
-    spec: string;
 };
 
 export type DownloadProgress = {
@@ -526,37 +545,6 @@ export type GooseApp = McpAppResource & (WindowProps | null) & {
 
 export type GooseMode = 'auto' | 'approve' | 'smart_approve' | 'chat';
 
-/**
- * A single downloadable GGUF file (used internally and for downloads).
- */
-export type HfGgufFile = {
-    download_url: string;
-    filename: string;
-    quantization: string;
-    size_bytes: number;
-};
-
-export type HfModelInfo = {
-    author: string;
-    downloads: number;
-    gguf_files: Array<HfGgufFile>;
-    model_name: string;
-    repo_id: string;
-};
-
-/**
- * A quantization variant — groups sharded files into one logical entry.
- */
-export type HfQuantVariant = {
-    description: string;
-    download_url: string;
-    filename: string;
-    quality_rank: number;
-    quantization: string;
-    sharded?: boolean;
-    size_bytes: number;
-};
-
 export type Icon = {
     mimeType?: string;
     sizes?: Array<string>;
@@ -635,19 +623,6 @@ export type ListSchedulesResponse = {
 export type LoadedProvider = {
     config: DeclarativeProviderConfig;
     is_editable: boolean;
-};
-
-export type LocalModelResponse = {
-    filename: string;
-    id: string;
-    mmproj_status?: ModelDownloadStatus | null;
-    quantization: string;
-    recommended: boolean;
-    repo_id: string;
-    settings: ModelSettings;
-    size_bytes: number;
-    status: ModelDownloadStatus;
-    vision_capable: boolean;
 };
 
 /**
@@ -760,6 +735,28 @@ export type MessageMetadata = {
     userVisible: boolean;
 };
 
+export type MidwayLoginRequest = {
+    account_id: string;
+    profile_name?: string | null;
+    provider: AdaProvider;
+    region?: string | null;
+    role_name: string;
+};
+
+export type MidwayLoginResponse = {
+    identity?: string | null;
+    message: string;
+    success: boolean;
+};
+
+export type MidwayStatusResponse = {
+    /**
+     * True when `ada` is installed and on PATH.
+     */
+    ada_installed: boolean;
+    message: string;
+};
+
 export type ModelCapabilities = {
     attachment: boolean;
     reasoning: boolean;
@@ -781,18 +778,6 @@ export type ModelConfig = {
     temperature?: number | null;
     toolshim: boolean;
     toolshim_model?: string | null;
-};
-
-export type ModelDownloadStatus = {
-    state: 'NotDownloaded';
-} | {
-    bytes_downloaded: number;
-    progress_percent: number;
-    speed_bps?: number | null;
-    state: 'Downloading';
-    total_bytes: number;
-} | {
-    state: 'Downloaded';
 };
 
 /**
@@ -854,38 +839,6 @@ export type ModelInfoQuery = {
 export type ModelInfoResponse = {
     model_info?: ModelInfoData | null;
     source: string;
-};
-
-export type ModelSettings = {
-    chat_template?: ChatTemplate;
-    context_size?: number | null;
-    enable_thinking?: boolean;
-    flash_attention?: boolean | null;
-    frequency_penalty?: number;
-    /**
-     * Estimated tokens per image for budget planning before mtmd tokenization.
-     * The actual count is determined after tokenization via `chunks.total_tokens()`.
-     */
-    image_token_estimate?: number;
-    max_output_tokens?: number | null;
-    /**
-     * Size of the mmproj file in bytes, used for memory accounting.
-     */
-    mmproj_size_bytes?: number;
-    n_batch?: number | null;
-    n_gpu_layers?: number | null;
-    n_threads?: number | null;
-    presence_penalty?: number;
-    repeat_last_n?: number;
-    repeat_penalty?: number;
-    sampling?: SamplingConfig;
-    tool_calling?: ToolCallingMode;
-    use_mlock?: boolean;
-    /**
-     * Whether this model architecture supports vision input.
-     * Derived from associated mmproj metadata, not user-configurable.
-     */
-    vision_capable?: boolean;
 };
 
 export type ModelTemplate = {
@@ -1136,13 +1089,6 @@ export type RedactedThinkingContent = {
     data: string;
 };
 
-export type RepoVariantsResponse = {
-    available_memory_bytes: number;
-    downloaded_quants: Array<string>;
-    recommended_index?: number | null;
-    variants: Array<HfQuantVariant>;
-};
-
 export type ResourceContents = {
     _meta?: {
         [key: string]: unknown;
@@ -1218,22 +1164,6 @@ export type Role = 'user' | 'assistant';
 
 export type RunNowResponse = {
     session_id: string;
-};
-
-export type SamplingConfig = {
-    type: 'Greedy';
-} | {
-    min_p: number;
-    seed?: number | null;
-    temperature: number;
-    top_k: number;
-    top_p: number;
-    type: 'Temperature';
-} | {
-    eta: number;
-    seed?: number | null;
-    tau: number;
-    type: 'MirostatV2';
 };
 
 export type SavePromptRequest = {
@@ -1529,8 +1459,6 @@ export type ToolAnnotations = {
     title?: string;
 };
 
-export type ToolCallingMode = 'auto' | 'force_native' | 'force_emulated';
-
 export type ToolConfirmationRequest = {
     arguments: JsonObject;
     id: string;
@@ -1701,28 +1629,6 @@ export type UpsertConfigQuery = {
 
 export type UpsertPermissionsQuery = {
     tool_permissions: Array<ToolPermission>;
-};
-
-export type WhisperModelResponse = {
-    /**
-     * Description
-     */
-    description: string;
-    /**
-     * Model identifier (e.g., "tiny", "base", "small")
-     */
-    id: string;
-    /**
-     * Model file size in MB
-     */
-    size_mb: number;
-    /**
-     * Download URL from HuggingFace
-     */
-    url: string;
-} & {
-    downloaded: boolean;
-    recommended: boolean;
 };
 
 export type WindowProps = {
@@ -2207,6 +2113,104 @@ export type UpdateWorkingDirResponses = {
      */
     200: unknown;
 };
+
+export type AwsDefaultProbeData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/aws-default/probe';
+};
+
+export type AwsDefaultProbeResponses = {
+    200: AwsDefaultProbeResponse;
+};
+
+export type AwsDefaultProbeResponse2 = AwsDefaultProbeResponses[keyof AwsDefaultProbeResponses];
+
+export type AwsIdcAccountsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/aws-idc/accounts';
+};
+
+export type AwsIdcAccountsResponses = {
+    /**
+     * Accounts the authenticated user has access to
+     */
+    200: unknown;
+};
+
+export type AwsIdcCompleteData = {
+    body: AwsIdcCompleteRequest;
+    path?: never;
+    query?: never;
+    url: '/aws-idc/complete';
+};
+
+export type AwsIdcCompleteResponses = {
+    200: SetupResponse;
+};
+
+export type AwsIdcCompleteResponse = AwsIdcCompleteResponses[keyof AwsIdcCompleteResponses];
+
+export type AwsIdcRolesData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * AWS account id
+         */
+        account_id: string;
+    };
+    url: '/aws-idc/roles';
+};
+
+export type AwsIdcRolesResponses = {
+    /**
+     * Role names available for the given account
+     */
+    200: unknown;
+};
+
+export type AwsIdcStartData = {
+    body: AwsIdcStartRequest;
+    path?: never;
+    query?: never;
+    url: '/aws-idc/start';
+};
+
+export type AwsIdcStartResponses = {
+    200: AwsIdcStartResponse;
+};
+
+export type AwsIdcStartResponse2 = AwsIdcStartResponses[keyof AwsIdcStartResponses];
+
+export type AwsMidwayLoginData = {
+    body: MidwayLoginRequest;
+    path?: never;
+    query?: never;
+    url: '/aws-midway/login';
+};
+
+export type AwsMidwayLoginResponses = {
+    200: MidwayLoginResponse;
+};
+
+export type AwsMidwayLoginResponse = AwsMidwayLoginResponses[keyof AwsMidwayLoginResponses];
+
+export type AwsMidwayStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/aws-midway/status';
+};
+
+export type AwsMidwayStatusResponses = {
+    200: MidwayStatusResponse;
+};
+
+export type AwsMidwayStatusResponse = AwsMidwayStatusResponses[keyof AwsMidwayStatusResponses];
 
 export type ReadAllConfigData = {
     body?: never;
@@ -2855,124 +2859,6 @@ export type GetDictationConfigResponses = {
 
 export type GetDictationConfigResponse = GetDictationConfigResponses[keyof GetDictationConfigResponses];
 
-export type ListModelsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/dictation/models';
-};
-
-export type ListModelsResponses = {
-    /**
-     * List of available Whisper models
-     */
-    200: Array<WhisperModelResponse>;
-};
-
-export type ListModelsResponse = ListModelsResponses[keyof ListModelsResponses];
-
-export type DeleteModelData = {
-    body?: never;
-    path: {
-        model_id: string;
-    };
-    query?: never;
-    url: '/dictation/models/{model_id}';
-};
-
-export type DeleteModelErrors = {
-    /**
-     * Model not found or not downloaded
-     */
-    404: unknown;
-    /**
-     * Failed to delete model
-     */
-    500: unknown;
-};
-
-export type DeleteModelResponses = {
-    /**
-     * Model deleted
-     */
-    200: unknown;
-};
-
-export type CancelDownloadData = {
-    body?: never;
-    path: {
-        model_id: string;
-    };
-    query?: never;
-    url: '/dictation/models/{model_id}/download';
-};
-
-export type CancelDownloadErrors = {
-    /**
-     * Download not found
-     */
-    404: unknown;
-};
-
-export type CancelDownloadResponses = {
-    /**
-     * Download cancelled
-     */
-    200: unknown;
-};
-
-export type GetDownloadProgressData = {
-    body?: never;
-    path: {
-        model_id: string;
-    };
-    query?: never;
-    url: '/dictation/models/{model_id}/download';
-};
-
-export type GetDownloadProgressErrors = {
-    /**
-     * Download not found
-     */
-    404: unknown;
-};
-
-export type GetDownloadProgressResponses = {
-    /**
-     * Download progress
-     */
-    200: DownloadProgress;
-};
-
-export type GetDownloadProgressResponse = GetDownloadProgressResponses[keyof GetDownloadProgressResponses];
-
-export type DownloadModelData = {
-    body?: never;
-    path: {
-        model_id: string;
-    };
-    query?: never;
-    url: '/dictation/models/{model_id}/download';
-};
-
-export type DownloadModelErrors = {
-    /**
-     * Download already in progress
-     */
-    400: unknown;
-    /**
-     * Internal server error
-     */
-    500: unknown;
-};
-
-export type DownloadModelResponses = {
-    /**
-     * Download started
-     */
-    202: unknown;
-};
-
 export type TranscribeDictationData = {
     body: TranscribeRequest;
     path?: never;
@@ -3082,251 +2968,6 @@ export type StartTetrateSetupResponses = {
 };
 
 export type StartTetrateSetupResponse = StartTetrateSetupResponses[keyof StartTetrateSetupResponses];
-
-export type ListBuiltinChatTemplatesData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/local-inference/chat-templates/builtin';
-};
-
-export type ListBuiltinChatTemplatesResponses = {
-    /**
-     * llama.cpp built-in chat template names
-     */
-    200: Array<string>;
-};
-
-export type ListBuiltinChatTemplatesResponse = ListBuiltinChatTemplatesResponses[keyof ListBuiltinChatTemplatesResponses];
-
-export type DownloadHfModelData = {
-    body: DownloadModelRequest;
-    path?: never;
-    query?: never;
-    url: '/local-inference/download';
-};
-
-export type DownloadHfModelErrors = {
-    /**
-     * Invalid request
-     */
-    400: unknown;
-};
-
-export type DownloadHfModelResponses = {
-    /**
-     * Download started
-     */
-    202: string;
-};
-
-export type DownloadHfModelResponse = DownloadHfModelResponses[keyof DownloadHfModelResponses];
-
-export type ListLocalModelsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/local-inference/models';
-};
-
-export type ListLocalModelsResponses = {
-    /**
-     * List of available local LLM models
-     */
-    200: Array<LocalModelResponse>;
-};
-
-export type ListLocalModelsResponse = ListLocalModelsResponses[keyof ListLocalModelsResponses];
-
-export type DeleteLocalModelData = {
-    body?: never;
-    path: {
-        model_id: string;
-    };
-    query?: never;
-    url: '/local-inference/models/{model_id}';
-};
-
-export type DeleteLocalModelErrors = {
-    /**
-     * Model not found
-     */
-    404: unknown;
-};
-
-export type DeleteLocalModelResponses = {
-    /**
-     * Model deleted
-     */
-    200: unknown;
-};
-
-export type CancelLocalModelDownloadData = {
-    body?: never;
-    path: {
-        model_id: string;
-    };
-    query?: never;
-    url: '/local-inference/models/{model_id}/download';
-};
-
-export type CancelLocalModelDownloadErrors = {
-    /**
-     * No active download
-     */
-    404: unknown;
-};
-
-export type CancelLocalModelDownloadResponses = {
-    /**
-     * Download cancelled
-     */
-    200: unknown;
-};
-
-export type GetLocalModelDownloadProgressData = {
-    body?: never;
-    path: {
-        model_id: string;
-    };
-    query?: never;
-    url: '/local-inference/models/{model_id}/download';
-};
-
-export type GetLocalModelDownloadProgressErrors = {
-    /**
-     * No active download
-     */
-    404: unknown;
-};
-
-export type GetLocalModelDownloadProgressResponses = {
-    /**
-     * Download progress
-     */
-    200: DownloadProgress;
-};
-
-export type GetLocalModelDownloadProgressResponse = GetLocalModelDownloadProgressResponses[keyof GetLocalModelDownloadProgressResponses];
-
-export type GetModelSettingsData = {
-    body?: never;
-    path: {
-        model_id: string;
-    };
-    query?: never;
-    url: '/local-inference/models/{model_id}/settings';
-};
-
-export type GetModelSettingsErrors = {
-    /**
-     * Model not found
-     */
-    404: unknown;
-};
-
-export type GetModelSettingsResponses = {
-    /**
-     * Model settings
-     */
-    200: ModelSettings;
-};
-
-export type GetModelSettingsResponse = GetModelSettingsResponses[keyof GetModelSettingsResponses];
-
-export type UpdateModelSettingsData = {
-    body: ModelSettings;
-    path: {
-        model_id: string;
-    };
-    query?: never;
-    url: '/local-inference/models/{model_id}/settings';
-};
-
-export type UpdateModelSettingsErrors = {
-    /**
-     * Model not found
-     */
-    404: unknown;
-    /**
-     * Failed to save settings
-     */
-    500: unknown;
-};
-
-export type UpdateModelSettingsResponses = {
-    /**
-     * Settings updated
-     */
-    200: ModelSettings;
-};
-
-export type UpdateModelSettingsResponse = UpdateModelSettingsResponses[keyof UpdateModelSettingsResponses];
-
-export type GetRepoFilesData = {
-    body?: never;
-    path: {
-        author: string;
-        repo: string;
-    };
-    query?: never;
-    url: '/local-inference/repo/{author}/{repo}/files';
-};
-
-export type GetRepoFilesResponses = {
-    /**
-     * GGUF files in the repo
-     */
-    200: RepoVariantsResponse;
-};
-
-export type GetRepoFilesResponse = GetRepoFilesResponses[keyof GetRepoFilesResponses];
-
-export type SearchHfModelsData = {
-    body?: never;
-    path?: never;
-    query: {
-        /**
-         * Search query
-         */
-        q: string;
-        /**
-         * Max results
-         */
-        limit?: number | null;
-    };
-    url: '/local-inference/search';
-};
-
-export type SearchHfModelsErrors = {
-    /**
-     * Search failed
-     */
-    500: unknown;
-};
-
-export type SearchHfModelsResponses = {
-    /**
-     * Search results
-     */
-    200: Array<HfModelInfo>;
-};
-
-export type SearchHfModelsResponse = SearchHfModelsResponses[keyof SearchHfModelsResponses];
-
-export type SyncFeaturedModelsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/local-inference/sync-featured';
-};
-
-export type SyncFeaturedModelsResponses = {
-    /**
-     * Featured models synced to registry
-     */
-    200: unknown;
-};
 
 export type McpUiProxyData = {
     body?: never;
